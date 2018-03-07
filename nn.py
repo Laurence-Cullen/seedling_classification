@@ -37,13 +37,17 @@ def main():
     train_features, train_labels, crosval_features, crosval_labels, test_features, test_labels = \
         split_data(features, binary_training_labels, train_fraction=0.9, crosval_fraction=0.0, test_fraction=0.1)
 
-    reg_value = 0.00
+    reg_value = 0.02
 
     # building nn topology
     model = Sequential()
-    model.add(Dense(units=1000,
+    model.add(Dense(units=2500,
                     activation='relu',
-                    input_dim=image_size ** 2 * 3,
+                    input_dim=image_size ** 2,
+                    kernel_regularizer=regularizers.l2(reg_value)))
+
+    model.add(Dense(units=300,
+                    activation='relu',
                     kernel_regularizer=regularizers.l2(reg_value)))
 
     model.add(Dense(units=300,
@@ -67,16 +71,20 @@ def main():
     train_accuracy = {}
     test_accuracy = {}
 
-    while epoch < 200:
-        model.fit(train_features, train_labels, epochs=1, batch_size=128)
-        test_accuracy[epoch] = model.evaluate(test_features, test_labels, batch_size=128)[1]
-        train_accuracy[epoch] = model.evaluate(train_features, train_labels, batch_size=128)[1]
+    try:
+        while epoch < 2000:
+            model.fit(train_features, train_labels, epochs=1, batch_size=128)
+            test_accuracy[epoch] = model.evaluate(test_features, test_labels, batch_size=128)[1]
+            train_accuracy[epoch] = model.evaluate(train_features, train_labels, batch_size=128)[1]
 
-        # TODO add sequential model saving
+            # TODO add sequential model saving
 
-        print('\nepoch = %i\n' % epoch)
+            print('\nepoch = %i\n' % epoch)
 
-        epoch += 1
+            epoch += 1
+
+    except KeyboardInterrupt:
+        pass
 
     # plotting training and test accuracy histories
     plt.plot(train_accuracy.keys(), train_accuracy.values(), label='train')

@@ -2,10 +2,42 @@ import numpy as np
 import PIL.Image as Image
 import os
 import glob
-from preprocessor import preprocess
+import keras.preprocessing.image as image_generator
+from preprocessor import preprocess, extract_green_mask
+
+
+def augment_data(train_data_path, augmented_data_path, required_examples):
+
+    datagen = image_generator.ImageDataGenerator(width_shift_range=0.2,
+                                                 height_shift_range=0.2,
+                                                 rotation_range=180,
+                                                 zoom_range=0.2,
+                                                 horizontal_flip=True,
+                                                 vertical_flip=True)
+
+    classes = os.listdir(train_data_path)
+
+    print(classes)
+
+    batch_size = 100
+    i = 0
+
+    while required_examples > 0:
+        for batch in datagen.flow_from_directory(directory='data/train/',
+                                                 batch_size=batch_size,
+                                                 save_to_dir=augmented_data_path,
+                                                 save_prefix='gen_',
+                                                 save_format='png'):
+            i += 1
+            if i * batch_size > required_examples:
+                break
+
+        required_examples -= batch_size
 
 
 def load_train_data(train_data_path, image_size=100, grey_scale=False):
+
+
 
     categories = os.listdir(train_data_path)
 
@@ -19,10 +51,11 @@ def load_train_data(train_data_path, image_size=100, grey_scale=False):
         m += len(glob.glob(train_data_path + categories[category_index] + '/*.png'))
         category_dict[categories[category_index]] = category_index
 
-    if grey_scale:
-        features = np.zeros(shape=(m, image_size * image_size))
-    else:
-        features = np.zeros(shape=(m, image_size * image_size * 3))
+    features = np.zeros(shape=(m, image_size * image_size))
+    # if grey_scale:
+    #     features = np.zeros(shape=(m, image_size * image_size))
+    # else:
+    #     features = np.zeros(shape=(m, image_size * image_size * 3))
 
     labels = np.zeros(shape=(m, 1))
 
@@ -32,15 +65,27 @@ def load_train_data(train_data_path, image_size=100, grey_scale=False):
     for category in categories:
         data_files = glob.glob(train_data_path + category + '/*.png')
 
-        for data_file in data_files:
-            # loading and preprocessing image with name file
-            image = preprocess(Image.open(data_file), required_size=image_size)
-            array = np.asarray(image)
-            print(array.shape)
-            array = array[..., :3]
+        # Using RGB data
+        # for data_file in data_files:
+        #     # loading and preprocessing image with name file
+        #     image = preprocess(Image.open(data_file), required_size=image_size)
+        #     array = np.asarray(image)
+        #     print(array.shape)
+        #     array = array[..., :3]
+        #
+        #     # normalize and enter image data into feature array
+        #     features[i, :] = (np.copy(array.flatten()) / 256)
+        #     labels[i][0] = category_dict[category]
+        #     print('training example %i, file name = %s' % (i, data_file))
+        #     i += 1
 
-            # normalize and enter image data into feature array
-            features[i, :] = (np.copy(array.flatten()) / 256) - 1
+        for data_file in data_files:
+            # loading and extracting green mask from image with name file
+            green_mask = extract_green_mask(Image.open(data_file), required_size=image_size)
+            print(green_mask.shape)
+
+            # enter green mask into feature array
+            features[i, :] = green_mask.flatten()
             labels[i][0] = category_dict[category]
             print('training example %i, file name = %s' % (i, data_file))
             i += 1
@@ -101,19 +146,21 @@ def split_data(features, labels, train_fraction, crosval_fraction, test_fraction
 
 
 def main():
-    features, labels, category_dict = load_train_data('./data/train/')
+    # features, labels, category_dict = load_train_data('./data/train/')
+    #
+    # print('features has shape of %s, labels has shape of %s' % (str(np.shape(features)),
+    #                                                             str(np.shape(labels))))
+    #
+    # training_features, training_labels, crosval_features, crosval_labels, test_features, test_labels = \
+    #     split_data(features, labels, train_fraction=0.8, crosval_fraction=0.1, test_fraction=0.1)
+    #
+    # print('training_features has shape of %s, training_labels has shape of %s' % (str(np.shape(training_features)),
+    #                                                                               str(np.shape(training_labels))))
+    #
+    # print('crosval_features has shape of %s, crosval_labels has shape of %s' % (str(np.shape(crosval_features)),
+    #                                                                             str(np.shape(crosval_labels))))
 
-    print('features has shape of %s, labels has shape of %s' % (str(np.shape(features)),
-                                                                str(np.shape(labels))))
-
-    training_features, training_labels, crosval_features, crosval_labels, test_features, test_labels = \
-        split_data(features, labels, train_fraction=0.8, crosval_fraction=0.1, test_fraction=0.1)
-
-    print('training_features has shape of %s, training_labels has shape of %s' % (str(np.shape(training_features)),
-                                                                                  str(np.shape(training_labels))))
-
-    print('crosval_features has shape of %s, crosval_labels has shape of %s' % (str(np.shape(crosval_features)),
-                                                                                str(np.shape(crosval_labels))))
+    augment_data(train_data_path='data/train/', augmented_data_path='data/augmented_data/', required_examples=1000)
 
 
 if __name__ == '__main__':
